@@ -52,6 +52,7 @@ void char_to_struct(char *org, struct message * res) {
     for (int i = 0; i < strlen(org); i++) {
         if (org[i] == ':') {
             if (colon_cnt == 2) res->source[src_ptr] = '\0';
+            if (colon_cnt > 2) res->data[dta_ptr++] = org[i];
             colon_cnt++;
             continue;
         }

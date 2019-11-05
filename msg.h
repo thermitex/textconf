@@ -11,6 +11,12 @@
 #define MESSAGE         107
 #define QUERY           108
 #define QU_ACK          109
+#define NEW_SESS        110
+#define LEAVE_SESS      111
+#define NS_ACK          113
+#define NS_NAK          114
+#define JN_ACK          115
+#define JN_NAK          116
 
 struct message * msg_init(int type);
 void struct_to_char(struct message *org, char *res);

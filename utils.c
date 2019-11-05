@@ -60,6 +60,38 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         strcpy(query->source, id);
         send_msg(query, *sockfd, 1);
 
+    } else if (!strcmp(args[0], "/createsession")) {
+
+        /* create new session */
+        if (argc < 2) {
+            printf("Usage: /createsession <session ID>\n");
+            return;
+        }
+        struct message *new_sess_req = msg_init(NEW_SESS);
+        strcpy(new_sess_req->source, id);
+        strcpy(new_sess_req->data, args[1]);
+        send_msg(new_sess_req, *sockfd, 1);
+
+    } else if (!strcmp(args[0], "/joinsession")) {
+
+        /* join session */
+        if (argc < 2) {
+            printf("Usage: /joinsession <session ID>\n");
+            return;
+        }
+        struct message *join_req = msg_init(JOIN);
+        strcpy(join_req->source, id);
+        strcpy(join_req->data, args[1]);
+        send_msg(join_req, *sockfd, 1);
+
+    } else if (!strcmp(args[0], "/leavesession")) {
+
+        /* leave session */
+        struct message *leave_req = msg_init(LEAVE_SESS);
+        strcpy(leave_req->source, id);
+        send_msg(leave_req, *sockfd, 1);
+        printf("[Left current session]\n");
+
     } else if (strcmp(id, "NotLoggedIn")) {
 
         /* send message */
@@ -98,7 +130,7 @@ void client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int 
 }
 
 /* when a message comes, server decides how to handle it */
-void server_msg_handler(struct message *msg, Client* this_client, Client *all_clients) {
+void server_msg_handler(struct message *msg, Client* this_client, Client *all_clients, char **sessions, int *ses_cnt) {
     switch (msg->type) {
     case LOGIN:
 
@@ -121,7 +153,8 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
         printf("Received message.\n");
         for (int i = 0; i < CLIENT_NUM; i++) {
             if (!strcmp(all_clients[i].id, "")) continue;
-            send_msg(msg, all_clients[i].connfd, 0);
+            if (!strcmp(all_clients[i].session, this_client->session) && strcmp(all_clients[i].session, "-"))
+                send_msg(msg, all_clients[i].connfd, 0);
         }
         free(msg);
         break;
@@ -150,6 +183,53 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
         strcat(query_resp->data, ending);
         strcat(query_resp->data, line);
         send_msg(query_resp, this_client->connfd, 1);
+        break;
+
+    case NEW_SESS:
+
+        /* handling create session request */
+        printf("Received create new session request.\n");
+        struct message *new_sess_resp;
+        for (int i = 0; i < *ses_cnt; i++) {
+            if (!strcmp(sessions[i], msg->data)) {
+                new_sess_resp = msg_init(NS_NAK);
+                strcpy(new_sess_resp->data, "Duplicate session name");
+                send_msg(new_sess_resp, this_client->connfd, 1);
+                return;
+            }
+        }
+        sessions[*ses_cnt] = malloc(SMALL_SIZE);
+        strcpy(sessions[*ses_cnt], msg->data);
+        *ses_cnt = *ses_cnt + 1;
+        new_sess_resp = msg_init(NS_ACK);
+        strcpy(new_sess_resp->data, msg->data);
+        send_msg(new_sess_resp, this_client->connfd, 1);
+        break;
+    
+    case JOIN:
+
+        /* handling join session request */
+        printf("Received join session request.\n");
+        struct message *join_resp;
+        for (int i = 0; i < *ses_cnt; i++) {
+            if (!strcmp(sessions[i], msg->data)) {
+                strcpy(this_client->session, msg->data);
+                join_resp = msg_init(JN_ACK);
+                strcpy(join_resp->data, msg->data);
+                send_msg(join_resp, this_client->connfd, 1);
+                return;
+            }
+        }
+        join_resp = msg_init(JN_NAK);
+        strcpy(join_resp->data, "Session not found");
+        send_msg(join_resp, this_client->connfd, 1);
+        break;
+
+    case LEAVE_SESS:
+
+        /* handling leave session request */
+        printf("Received leave session request.\n");
+        strcpy(this_client->session, "-");
 
     default:
         break;

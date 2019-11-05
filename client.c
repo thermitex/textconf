@@ -1,7 +1,6 @@
 #include "utils.h"
 
 char *id;
-int header = 1;
 
 int main(int argc, char **argv) {
 
@@ -20,8 +19,8 @@ int main(int argc, char **argv) {
     pthread_create(listent, NULL, listener, (void *)&sockfd);
 
     while (1) {
-        if (header) printf("[%s] ", id);
-        fflush(stdout);
+        // if (header) printf("[%s] ", id);
+        // fflush(stdout);
         if (!fgets(cmd, 1000, stdin))
             break;
         char resv_cmd[1000];
@@ -46,15 +45,18 @@ void* listener(void *vsockfd) {
     while (!strcmp(id, "NotLoggedIn")) {
         ;
     }
-    while(1) {
-        header = 0;
+    while (1) {
         char buffer[BUFFER_SIZE];
         bzero(buffer, BUFFER_SIZE);
         read(*sockfd, buffer, BUFFER_SIZE);
         struct message *msg = malloc(sizeof(struct message));
         char_to_struct(buffer, msg);
-        if (msg->type == MESSAGE) printf("%s: %s\n", msg->source, msg->data);
+        if (msg->type == MESSAGE) printf("[%s] %s\n", msg->source, msg->data);
         if (msg->type == QU_ACK) printf("%s", msg->data);
+        if (msg->type == NS_ACK) printf("[Successfully created session %s]\n", msg->data);
+        if (msg->type == NS_NAK) printf("[Create new session failed: %s]\n", msg->data);
+        if (msg->type == JN_ACK) printf("[Successfully joined session %s]\n", msg->data);
+        if (msg->type == JN_NAK) printf("[Join session failed: %s]\n", msg->data);
     }
     return 0;
 }
