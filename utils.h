@@ -18,6 +18,7 @@
 
 #define BUFFER_SIZE     1024
 #define CLIENT_NUM      100
+#define SMALL_SIZE      100
 #define SA struct sockaddr
 
 #define MAX_NAME        1024
@@ -30,10 +31,12 @@ struct message {
     char data[MAX_DATA];
 };
 typedef struct client {
-    char *id;
+    char id[SMALL_SIZE];
+    in_addr_t ipaddr;
+    in_port_t port;
     int closed;
     int connfd;
-    int session;
+    char session[SMALL_SIZE];
     pthread_t *handler;
 } Client;
 

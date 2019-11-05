@@ -29,6 +29,7 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         int port = atoi(args[4]);
         client_connect(*sockfd, servaddr, args[3], port);
         client_login(args[1], args[2], *sockfd);
+        /* check response */
         char buffer[BUFFER_SIZE];
         struct message *resp;
         read(*sockfd, buffer, sizeof(buffer));
@@ -51,6 +52,13 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         sock_init(sockfd, servaddr);
         id = "NotLoggedIn";
         printf("Logged out from server.\n");
+
+    } else if (!strcmp(args[0], "/list")) {
+
+        /* list */
+        struct message *query = msg_init(QUERY);
+        strcpy(query->source, id);
+        send_msg(query, *sockfd, 1);
 
     } else if (strcmp(id, "NotLoggedIn")) {
 
@@ -116,6 +124,32 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
             send_msg(msg, all_clients[i].connfd, 0);
         }
         free(msg);
+        break;
+
+    case QUERY:
+
+        /* handling query request */
+        printf("Received query request.\n");
+        struct message *query_resp = msg_init(QU_ACK);
+        int cli_cnt = 0;
+        char line[30] = "---------------------------\n";
+        strcat(query_resp->data, line);
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].id, "")) continue;
+            cli_cnt++;
+            char entry[SMALL_SIZE];
+            sprintf(entry, "%s | IP %d | Port %d | Joined session %s\n", \
+                    all_clients[i].id, \
+                    all_clients[i].ipaddr, \
+                    all_clients[i].port, \
+                    all_clients[i].session);
+            strcat(query_resp->data, entry);
+        }
+        char ending[SMALL_SIZE];
+        sprintf(ending, "%d active clients in total\n", cli_cnt);
+        strcat(query_resp->data, ending);
+        strcat(query_resp->data, line);
+        send_msg(query_resp, this_client->connfd, 1);
 
     default:
         break;
@@ -123,6 +157,7 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
 }
 
 void client_login(char *id, char *pswd, int sockfd) {
+    printf("Logging in as %s...\n", id);
     struct message *lo_msg = msg_init(LOGIN);
     strcpy(lo_msg->source, id);
     strcpy(lo_msg->data, pswd);

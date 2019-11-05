@@ -53,7 +53,8 @@ void* listener(void *vsockfd) {
         read(*sockfd, buffer, BUFFER_SIZE);
         struct message *msg = malloc(sizeof(struct message));
         char_to_struct(buffer, msg);
-        printf("%s: %s\n", msg->source, msg->data);
+        if (msg->type == MESSAGE) printf("%s: %s\n", msg->source, msg->data);
+        if (msg->type == QU_ACK) printf("%s", msg->data);
     }
     return 0;
 }
