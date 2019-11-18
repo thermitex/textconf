@@ -17,6 +17,5 @@ utils.o: utils.c utils.h msg.h
 msg.o: msg.c msg.h utils.h
 
 .PHONY: clean
-
 clean:
 	rm -f *.o *~
