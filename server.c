@@ -12,10 +12,7 @@ int main(int argc, char **argv) {
     clients = (Client *)malloc(CLIENT_NUM * sizeof(Client));
 
     for (int i = 0; i < CLIENT_NUM; i++) {
-        clients[i].closed = 0;
-        strcpy(clients[i].id, "");
-        clients[i].connfd = -1;
-        strcpy(clients[i].session, "-");
+        reset_client(&clients[i]);
         clients[i].handler = malloc(sizeof(pthread_t));
     }
     
@@ -49,7 +46,7 @@ int main(int argc, char **argv) {
         else {
             printf("Incoming connection.\n");
             (clients + client_cnt)->connfd = connfd;
-            (clients + client_cnt)->ipaddr = cli.sin_addr.s_addr;
+            (clients + client_cnt)->ipaddr = cli.sin_addr;
             (clients + client_cnt)->port = cli.sin_port;
             int ret = pthread_create((clients + client_cnt)->handler, NULL, \
             server_client_handler, (void *)(clients + client_cnt));

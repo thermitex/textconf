@@ -1,6 +1,8 @@
 #include "utils.h"
 
 char *id;
+pthread_t *listent;
+int sockfd, connfd;
 
 int main(int argc, char **argv) {
 
@@ -9,13 +11,12 @@ int main(int argc, char **argv) {
     int n = 0;
     char *ptr;
     id = malloc(100);
-    strcpy(id, "NotLoggedIn");
-    int sockfd, connfd; 
+    strcpy(id, "NotLoggedIn"); 
     struct sockaddr_in servaddr, cli;
 
     /* Init socket */
     sock_init(&sockfd, &servaddr);
-    pthread_t *listent = malloc(sizeof(pthread_t));
+    listent = malloc(sizeof(pthread_t));
     pthread_create(listent, NULL, listener, (void *)&sockfd);
 
     while (1) {
@@ -46,6 +47,11 @@ void* listener(void *vsockfd) {
         ;
     }
     while (1) {
+        // if (!strcmp(id, "NotLoggedIn")) {
+        //     printf("Restart thread\n");
+        //     pthread_create(listent, NULL, listener, (void *)&sockfd);
+        //     pthread_exit(NULL);
+        // }
         char buffer[BUFFER_SIZE];
         bzero(buffer, BUFFER_SIZE);
         read(*sockfd, buffer, BUFFER_SIZE);

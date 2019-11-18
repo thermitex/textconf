@@ -3,11 +3,7 @@
 
 /* server authenticate if the login is successful */
 int server_authenticate(char *id, char *pswd) {
-    if (!strcmp(id, "user1")) {
-        if (!strcmp(pswd, "password")) return 1;
-    } else if (!strcmp(id, "user2")) {
-        if (!strcmp(pswd, "password")) return 1;
-    }
+    if (!strcmp(pswd, "password")) return 1;
     return 0;
 }
 
@@ -36,10 +32,10 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         resp = (struct message *)malloc(sizeof(struct message));
         char_to_struct(buffer, resp);
         if (resp->type == LO_ACK) {
-            printf("Login successful.\n");
+            printf("[Login successful]\n");
             strcpy(id, args[1]);
         } else {
-            printf("Invalid username or password.\n");
+            printf("[Login failed: Invalid username or password]\n");
             close(*sockfd);
             sock_init(sockfd, servaddr);
         }
@@ -48,10 +44,13 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
     } else if (!strcmp(args[0], "/logout")) {
 
         /* logout */
+        struct message *exit_msg = msg_init(EXIT);
+        strcpy(exit_msg->source, id);
+        send_msg(exit_msg, *sockfd, 1);
         close(*sockfd);
         sock_init(sockfd, servaddr);
-        id = "NotLoggedIn";
-        printf("Logged out from server.\n");
+        strcpy(id, "NotLoggedIn");
+        printf("[Logged out from server]\n");
 
     } else if (!strcmp(args[0], "/list")) {
 
@@ -171,9 +170,9 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
             if (!strcmp(all_clients[i].id, "")) continue;
             cli_cnt++;
             char entry[SMALL_SIZE];
-            sprintf(entry, "%s | IP %d | Port %d | Joined session %s\n", \
+            sprintf(entry, "%s | IP %s | Port %d | Joined session %s\n", \
                     all_clients[i].id, \
-                    all_clients[i].ipaddr, \
+                    inet_ntoa(all_clients[i].ipaddr), \
                     all_clients[i].port, \
                     all_clients[i].session);
             strcat(query_resp->data, entry);
@@ -191,6 +190,7 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
         printf("Received create new session request.\n");
         struct message *new_sess_resp;
         for (int i = 0; i < *ses_cnt; i++) {
+            if (!strcmp(sessions[i], "-")) continue;
             if (!strcmp(sessions[i], msg->data)) {
                 new_sess_resp = msg_init(NS_NAK);
                 strcpy(new_sess_resp->data, "Duplicate session name");
@@ -212,6 +212,7 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
         printf("Received join session request.\n");
         struct message *join_resp;
         for (int i = 0; i < *ses_cnt; i++) {
+            if (!strcmp(sessions[i], "-")) continue;
             if (!strcmp(sessions[i], msg->data)) {
                 strcpy(this_client->session, msg->data);
                 join_resp = msg_init(JN_ACK);
@@ -229,7 +230,26 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
 
         /* handling leave session request */
         printf("Received leave session request.\n");
+        char temp[SMALL_SIZE];
+        strcpy(temp, this_client->session);
         strcpy(this_client->session, "-");
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].session, temp)) return;
+        }
+        for (int i = 0; i < *ses_cnt; i++) {
+            if (!strcmp(sessions[i], temp)) {
+                strcpy(sessions[i], "-");
+                printf("Closed session due to no online users.\n");
+                break;
+            }
+        }
+        break;
+
+    case EXIT:
+
+        /* handling exit request */
+        printf("Received logout request.\n");
+        reset_client(this_client);
 
     default:
         break;
@@ -237,10 +257,17 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
 }
 
 void client_login(char *id, char *pswd, int sockfd) {
-    printf("Logging in as %s...\n", id);
+    printf("[Logging in as %s...]\n", id);
     struct message *lo_msg = msg_init(LOGIN);
     strcpy(lo_msg->source, id);
     strcpy(lo_msg->data, pswd);
     lo_msg->size = strlen(pswd);
     send_msg(lo_msg, sockfd, 1);
+}
+
+void reset_client(Client *client) {
+    client->closed = 0;
+    strcpy(client->id, "");
+    client->connfd = -1;
+    strcpy(client->session, "-");
 }

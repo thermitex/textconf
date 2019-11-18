@@ -33,7 +33,7 @@ struct message {
 };
 typedef struct client {
     char id[SMALL_SIZE];
-    in_addr_t ipaddr;
+    struct in_addr ipaddr;
     in_port_t port;
     int closed;
     int connfd;
@@ -49,5 +49,6 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
 void client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int port);
 void client_login(char *id, char *pswd, int sockfd);
 void* listener(void *vsockfd);
+void reset_client(Client *client);
 
 #endif
