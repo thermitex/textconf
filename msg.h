@@ -17,6 +17,10 @@
 #define NS_NAK          114
 #define JN_ACK          115
 #define JN_NAK          116
+#define INVIT           117
+#define INVIT_RX        118
+#define INVIT_ACK       119
+#define INVIT_NAK       120
 
 struct message * msg_init(int type);
 void struct_to_char(struct message *org, char *res);

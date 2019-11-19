@@ -8,9 +8,30 @@ int server_authenticate(char *id, char *pswd) {
 }
 
 /* main func for client to execute commands */
-void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_in *servaddr, char *id) {
+void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_in *servaddr, Cache *cache, char *id) {
     if (!strcmp(args[0], "/quit")) {
         exit(0);
+    } else if (cache->waiting_status != WS_NULL) {
+
+        if (cache->waiting_status == WS_INVITED) {
+            struct message *invit_resp;
+            if (!strcmp(args[0], "/y")) {
+                invit_resp = msg_init(INVIT_ACK);
+                strcpy(invit_resp->source, cache->cache_char_a);
+                printf("[Invitation accepted]\n");
+                struct message *join = msg_init(JOIN);
+                strcpy(join->data, cache->cache_char_b);
+                send_msg(join, *sockfd, 1);
+            } else {
+                invit_resp = msg_init(INVIT_NAK);
+                strcpy(invit_resp->source, cache->cache_char_a);
+                strcpy(invit_resp->data, "Recipent declined your invitation");
+                printf("[Invitation declined]\n");
+            }
+            send_msg(invit_resp, *sockfd, 1);
+        }
+        cache->waiting_status = WS_NULL;
+
     } else if (!strcmp(args[0], "/login")) {
 
         /* login */
@@ -90,6 +111,19 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         strcpy(leave_req->source, id);
         send_msg(leave_req, *sockfd, 1);
         printf("[Left current session]\n");
+
+    } else if (!strcmp(args[0], "/invite")) {
+
+        /* invite someone to current session */
+        if (argc < 2) {
+            printf("Usage: /invite <User ID>\n");
+            return;
+        }
+        struct message *invit_req = msg_init(INVIT);
+        strcpy(invit_req->source, id);
+        strcpy(invit_req->data, args[1]);
+        send_msg(invit_req, *sockfd, 1);
+        printf("[Sending inivitation to %s...]\n", args[1]);
 
     } else if (strcmp(id, "NotLoggedIn")) {
 
@@ -241,6 +275,78 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
                 strcpy(sessions[i], "-");
                 printf("Closed session due to no online users.\n");
                 break;
+            }
+        }
+        break;
+
+    case INVIT:
+
+        /* handling invitation request */
+        printf("Received invitation request.\n");
+        char tempsess[SMALL_SIZE];
+        int sendbackfd;
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].id, "")) continue;
+            if (!strcmp(all_clients[i].id, msg->source)) {
+                strcpy(tempsess, all_clients[i].session);
+                sendbackfd = all_clients[i].connfd;
+                break;
+            }
+        }
+        struct message *invit;
+        invit = msg_init(INVIT_NAK);
+        strcpy(invit->source, msg->data);
+        if (!strcmp(tempsess, "-")) {
+            strcpy(invit->data, "No current session joined");
+            send_msg(invit, sendbackfd, 1);
+            return;
+        }
+        if (!strcmp(msg->source, msg->data)) {
+            strcpy(invit->data, "Do not invite youself");
+            send_msg(invit, sendbackfd, 1);
+            return;
+        }
+        invit = msg_init(INVIT_RX);
+        strcpy(invit->data, tempsess);
+        strcpy(invit->source, msg->source);
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].id, "")) continue;
+            if (!strcmp(all_clients[i].id, msg->data)) {
+                send_msg(invit, all_clients[i].connfd, 1);
+                return;
+            }
+        }
+        invit = msg_init(INVIT_NAK);
+        strcpy(invit->source, msg->data);
+        strcpy(invit->data, "User does not exist");
+        send_msg(invit, sendbackfd, 1);
+        break;
+
+    case INVIT_ACK:
+
+        printf("Received invitation acceptance.\n");
+        struct message *invit_resp = msg_init(INVIT_ACK);
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].id, "")) continue;
+            if (!strcmp(all_clients[i].id, msg->source)) {
+                strcpy(invit_resp->source, this_client->id);
+                send_msg(invit_resp, all_clients[i].connfd, 1);
+                return;
+            }
+        }
+        break;
+
+    case INVIT_NAK:
+
+        printf("Received invitation declination.\n");
+        struct message *invit_resp_n = msg_init(INVIT_NAK);
+        for (int i = 0; i < CLIENT_NUM; i++) {
+            if (!strcmp(all_clients[i].id, "")) continue;
+            if (!strcmp(all_clients[i].id, msg->source)) {
+                strcpy(invit_resp_n->source, this_client->id);
+                strcpy(invit_resp_n->data, msg->data);
+                send_msg(invit_resp_n, all_clients[i].connfd, 1);
+                return;
             }
         }
         break;

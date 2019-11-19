@@ -3,6 +3,7 @@
 char *id;
 pthread_t *listent;
 int sockfd, connfd;
+Cache cache;
 
 int main(int argc, char **argv) {
 
@@ -11,6 +12,7 @@ int main(int argc, char **argv) {
     int n = 0;
     char *ptr;
     id = malloc(100);
+    cache.waiting_status = WS_NULL;
     strcpy(id, "NotLoggedIn"); 
     struct sockaddr_in servaddr, cli;
 
@@ -36,7 +38,7 @@ int main(int argc, char **argv) {
         for (n = 0; (args[n] = strtok(ptr, " \n")); n++, ptr = NULL);
         if (n <= 0) // no input
             continue;
-        client_exec(resv_cmd, args, n, &sockfd, &servaddr, id);
+        client_exec(resv_cmd, args, n, &sockfd, &servaddr, &cache, id);
     }
     
 }
@@ -63,6 +65,14 @@ void* listener(void *vsockfd) {
         if (msg->type == NS_NAK) printf("[Create new session failed: %s]\n", msg->data);
         if (msg->type == JN_ACK) printf("[Successfully joined session %s]\n", msg->data);
         if (msg->type == JN_NAK) printf("[Join session failed: %s]\n", msg->data);
+        if (msg->type == INVIT_ACK) printf("[%s has accepted your invitation]\n", msg->source);
+        if (msg->type == INVIT_NAK) printf("[Invitation for %s failed: %s]\n", msg->source, msg->data);
+        if (msg->type == INVIT_RX) {
+            printf("[Initation from %s to join session %s]\n[enter /y to accept, else to decline]\n", msg->source, msg->data);
+            strcpy(cache.cache_char_a, msg->source);
+            strcpy(cache.cache_char_b, msg->data);
+            cache.waiting_status = WS_INVITED;
+        }
     }
     return 0;
 }

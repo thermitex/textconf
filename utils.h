@@ -25,6 +25,9 @@
 #define MAX_NAME        1024
 #define MAX_DATA        1024
 
+#define WS_NULL         0
+#define WS_INVITED      1
+
 struct message {
     unsigned int type;
     unsigned int size;
@@ -41,11 +44,18 @@ typedef struct client {
     pthread_t *handler;
 } Client;
 
+typedef struct cache {
+    int cache_int[100];
+    char cache_char_a[SMALL_SIZE];
+    char cache_char_b[SMALL_SIZE];
+    int waiting_status;
+} Cache;
+
 void sock_init(int *sockfd, struct sockaddr_in *servaddr);
 int server_authenticate(char *id, char *pswd);
 void* server_client_handler(void *client);
 void server_msg_handler(struct message *msg, Client* this_client, Client *all_clients, char **sessions, int *ses_cnt);
-void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_in *servaddr, char *id);
+void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_in *servaddr, Cache *cache, char *id);
 void client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int port);
 void client_login(char *id, char *pswd, int sockfd);
 void* listener(void *vsockfd);
