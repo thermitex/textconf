@@ -1,6 +1,8 @@
 TARGETS = server client
 OBJECTS = server.o client.o utils.o msg.o
 LOADLIBES := -lpthread
+CC=gcc
+CFLAGS+=-Wall
 
 all: $(TARGETS)
 

@@ -5,6 +5,8 @@ pthread_t *listent;
 int sockfd, connfd;
 Cache cache;
 
+struct addrinfo *s;
+
 int main(int argc, char **argv) {
 
     char cmd[1000];
@@ -12,14 +14,36 @@ int main(int argc, char **argv) {
     int n = 0;
     char *ptr;
     id = malloc(100);
-    cache.waiting_status = WS_NULL;
+    client_cache_init(&cache);
     strcpy(id, "NotLoggedIn"); 
-    struct sockaddr_in servaddr, cli;
+    struct sockaddr_in servaddr;
 
     /* Init socket */
     sock_init(&sockfd, &servaddr);
     listent = malloc(sizeof(pthread_t));
     pthread_create(listent, NULL, listener, (void *)&sockfd);
+
+    /* get auto login */
+    FILE *configfp;
+    configfp = fopen("client.config", "r");
+    if (configfp == NULL) {
+        printf("[Auto login configure file not found]\n");
+    } else {
+        char al_cmd[1000];
+        int cnt = 1;
+        char delim[] = ",";
+        fscanf(configfp, "%s", al_cmd);
+        char *ptr = strtok(al_cmd, delim);
+        while(ptr != NULL)
+        {
+            args[cnt] = ptr;
+            ptr = strtok(NULL, delim);
+            cnt++;
+        }
+        args[0] = "/login";
+        client_exec("", args, cnt, &sockfd, &servaddr, &cache, id);
+        fclose(configfp);
+    }
 
     while (1) {
         // if (header) printf("[%s] ", id);
@@ -31,7 +55,7 @@ int main(int argc, char **argv) {
         resv_cmd[strlen(cmd) - 1] = '\0';
         ptr = index(cmd, 0);
         if (ptr[-1] != '\n') {
-            fprintf(stderr, "textconf.cli: command too long\n");
+            fprintf(stderr, "[ERROR: Command/message too long]\n");
             break;
         }
         ptr = cmd; // parse the command
@@ -46,14 +70,15 @@ int main(int argc, char **argv) {
 void* listener(void *vsockfd) {
     int *sockfd = (int *)vsockfd;
     while (!strcmp(id, "NotLoggedIn")) {
-        ;
+        if (cache.cache_int[0]) {
+            // printf("Restart thread\n");
+            // cache.cache_int[0] = 0;
+            // pthread_create(listent, NULL, listener, (void *)&sockfd);
+            // pthread_exit(NULL);
+        }
     }
     while (1) {
-        // if (!strcmp(id, "NotLoggedIn")) {
-        //     printf("Restart thread\n");
-        //     pthread_create(listent, NULL, listener, (void *)&sockfd);
-        //     pthread_exit(NULL);
-        // }
+
         char buffer[BUFFER_SIZE];
         bzero(buffer, BUFFER_SIZE);
         read(*sockfd, buffer, BUFFER_SIZE);
@@ -66,12 +91,16 @@ void* listener(void *vsockfd) {
         if (msg->type == JN_ACK) printf("[Successfully joined session %s]\n", msg->data);
         if (msg->type == JN_NAK) printf("[Join session failed: %s]\n", msg->data);
         if (msg->type == INVIT_ACK) printf("[%s has accepted your invitation]\n", msg->source);
-        if (msg->type == INVIT_NAK) printf("[Invitation for %s failed: %s]\n", msg->source, msg->data);
+        if (msg->type == INVIT_NAK) printf("[Invitation to %s failed: %s]\n", msg->source, msg->data);
         if (msg->type == INVIT_RX) {
-            printf("[Initation from %s to join session %s]\n[enter /y to accept, else to decline]\n", msg->source, msg->data);
+            printf("---------------------------\n[Initation from %s to join session %s]\nenter /y to accept, else to decline\n---------------------------\n", msg->source, msg->data);
             strcpy(cache.cache_char_a, msg->source);
             strcpy(cache.cache_char_b, msg->data);
             cache.waiting_status = WS_INVITED;
+        }
+        if (msg->type == LOGOUT) {
+            printf("[You have been logged out by server due to inactivity]\n");
+            exit(0);
         }
     }
     return 0;

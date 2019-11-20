@@ -21,6 +21,7 @@
 #define INVIT_RX        118
 #define INVIT_ACK       119
 #define INVIT_NAK       120
+#define LOGOUT          121
 
 struct message * msg_init(int type);
 void struct_to_char(struct message *org, char *res);

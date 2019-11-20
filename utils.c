@@ -44,7 +44,7 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
             return;
         }
         int port = atoi(args[4]);
-        client_connect(*sockfd, servaddr, args[3], port);
+        if (!client_connect(*sockfd, servaddr, args[3], port)) return;
         client_login(args[1], args[2], *sockfd);
         /* check response */
         char buffer[BUFFER_SIZE];
@@ -57,8 +57,10 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
             strcpy(id, args[1]);
         } else {
             printf("[Login failed: Invalid username or password]\n");
+            cache->cache_int[0] = 1;
             close(*sockfd);
-            sock_init(sockfd, servaddr);
+            exit(0);
+            // sock_init(sockfd, servaddr);
         }
         free(resp);
 
@@ -72,6 +74,7 @@ void client_exec(char *cmd, char **args, int argc, int *sockfd, struct sockaddr_
         sock_init(sockfd, servaddr);
         strcpy(id, "NotLoggedIn");
         printf("[Logged out from server]\n");
+        if (!(argc > 1 && !strcmp(args[1], "-h"))) exit(0);
 
     } else if (!strcmp(args[0], "/list")) {
 
@@ -149,7 +152,7 @@ void sock_init(int *sockfd, struct sockaddr_in *servaddr) {
 }
 
 /* init the client's connection to the server */
-void client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int port) {
+int client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int port) {
     servaddr->sin_family = AF_INET; 
     servaddr->sin_addr.s_addr = inet_addr(ipaddr); 
     servaddr->sin_port = htons(port); 
@@ -157,9 +160,11 @@ void client_connect(int sockfd, struct sockaddr_in *servaddr, char *ipaddr, int 
     // connect the client socket to server socket 
     if (connect(sockfd, (SA*)servaddr, sizeof(*servaddr)) != 0) { 
         printf("Connection with the server failed.\n"); 
+        return 0;
     } else {
         printf("Connected to the server.\n");
     }
+    return 1;
 }
 
 /* when a message comes, server decides how to handle it */
@@ -175,7 +180,7 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
             strcpy(this_client->id, msg->source);
         } else {
             login_resp = msg_init(LO_NAK);
-            // this_client->closed = 1;
+            this_client->closed = 1;
         }
         send_msg(login_resp, this_client->connfd, 1);
         break;
@@ -355,7 +360,7 @@ void server_msg_handler(struct message *msg, Client* this_client, Client *all_cl
 
         /* handling exit request */
         printf("Received logout request.\n");
-        reset_client(this_client);
+        this_client->closed = 1;
 
     default:
         break;
@@ -376,4 +381,14 @@ void reset_client(Client *client) {
     strcpy(client->id, "");
     client->connfd = -1;
     strcpy(client->session, "-");
+    gettimeofday(&client->start, NULL);
+}
+
+void client_cache_init(Cache *cache) {
+    strcpy(cache->cache_char_a, "");
+    strcpy(cache->cache_char_b, "");
+    cache->waiting_status = WS_NULL;
+    for (int i = 0; i < 100; i++) {
+        cache->cache_int[i] = 0;
+    }
 }
